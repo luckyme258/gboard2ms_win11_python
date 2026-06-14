@@ -24,8 +24,6 @@ py	Python	zz
 ja	Java	zz	
 gs	git status	zz	
 ai	AI	zz	
-shenm	神秘博士	zh-CN	
-sm	神秘博士	zh-CN	
 laoy	老友记	zh-CN	
 ly	老友记	zh-CN	
 dos	docker start	zz	
