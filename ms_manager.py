@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-微软拼音词库管理器
+微软拼音词库管理器 - 统一版
 内部格式: book.txt (短语\t编码\t候选位置)
 支持导入: Gboard TXT、微软拼音 DAT
 支持导出: Gboard TXT、微软拼音 DAT
@@ -333,7 +333,7 @@ class MsPhraseManager:
         ttk.Button(dialog, text="确定", command=save).grid(row=3, column=0, pady=10)
         ttk.Button(dialog, text="取消", command=dialog.destroy).grid(row=3, column=1, pady=10)
     
-    # ========== 导入 Gboard TXT（修正版）==========
+    # ========== 导入 Gboard TXT ==========
     
     def import_gboard(self):
         """导入 Gboard 格式文件 (编码\t短语)"""
@@ -386,69 +386,116 @@ class MsPhraseManager:
         self.update_stats()
         messagebox.showinfo("导入完成", f"成功导入 {added} 条新短语")
     
-    # ========== 导入微软拼音 DAT ==========
+    # ========== 导入微软拼音 DAT（严格按照 dat2txt.py 的逻辑）==========
     
     def parse_dat_file(self, filepath):
-        """解析微软拼音 DAT 文件"""
+        """
+        解析微软拼音 DAT 文件
+        此函数严格按照 dat2txt.py 中的 parse_ms_udp_dat 函数逻辑实现
+        """
         phrases = []
         
         with open(filepath, 'rb') as f:
             data = f.read()
+        
+        # 检查文件标识
+        magic = data[0:8]
+        if magic not in [b'machxudp', b'mschxudp']:
+            raise ValueError(f"无效的文件标识: {magic}")
+        
+        # 读取文件头
+        offset_start = struct.unpack('<I', data[16:20])[0]
+        entry_start = struct.unpack('<I', data[20:24])[0]
+        total_len = struct.unpack('<I', data[24:28])[0]
+        entry_count = struct.unpack('<I', data[28:32])[0]
+        
+        # 读取偏移表
+        offsets = []
+        for i in range(entry_count):
+            pos = offset_start + i * 4
+            offset = struct.unpack('<I', data[pos:pos+4])[0]
+            offsets.append(offset)
+        
+        # 解析每个词条
+        for i, offset in enumerate(offsets):
+            pos = entry_start + offset
             
-            if len(data) < 48:
-                raise ValueError("文件太小")
-            magic = data[0:8]
-            if magic not in [b'machxudp', b'mschxudp']:
-                raise ValueError(f"无效的文件标识: {magic}")
+            # 边界检查
+            if pos + 16 > len(data):
+                continue
             
-            offset_start = struct.unpack('<I', data[16:20])[0]
-            entry_start = struct.unpack('<I', data[20:24])[0]
-            entry_count = struct.unpack('<I', data[28:32])[0]
+            # 读取头部
+            marker = struct.unpack('<I', data[pos:pos+4])[0]
+            code_total_len = struct.unpack('<H', data[pos+4:pos+6])[0]
+            order = data[pos+6]
+            unknown = data[pos+7]
+            reserved = struct.unpack('<I', data[pos+8:pos+12])[0]
+            timestamp = struct.unpack('<I', data[pos+12:pos+16])[0]
             
-            offsets = []
-            for i in range(entry_count):
-                pos = offset_start + i * 4
-                offsets.append(struct.unpack('<I', data[pos:pos+4])[0])
+            # 编码字段
+            code_bytes_len = code_total_len - 12
+            code_start = pos + 16
+            code_end = code_start + code_bytes_len
+            if code_end > len(data):
+                continue
+            code_raw = data[code_start:code_end]
             
-            for offset in offsets:
-                pos = entry_start + offset
-                if pos + 16 > len(data):
-                    continue
-                
-                code_total_len = struct.unpack('<H', data[pos+4:pos+6])[0]
-                order = data[pos+6]
-                
-                code_start = pos + 16
-                code_bytes_len = code_total_len - 12
-                code_end = code_start + code_bytes_len
-                if code_end > len(data):
-                    continue
-                code_raw = data[code_start:code_end]
-                
-                phrase_start = code_end
-                phrase_end = phrase_start
-                while phrase_end + 2 <= len(data):
-                    if data[phrase_end:phrase_end+2] == b'\x00\x00':
-                        break
-                    phrase_end += 2
-                phrase_raw = data[phrase_start:phrase_end]
-                
-                null_pos = code_raw.find(b'\x00\x00')
-                if null_pos > 0:
-                    real_code = code_raw[:null_pos].decode('utf-16le', errors='replace')
-                    phrase_part1 = code_raw[null_pos+2:].decode('utf-16le', errors='replace')
+            # 短语字段
+            phrase_start = code_end
+            phrase_end = phrase_start
+            while phrase_end + 2 <= len(data):
+                if data[phrase_end:phrase_end+2] == b'\x00\x00':
+                    break
+                phrase_end += 2
+            phrase_raw = data[phrase_start:phrase_end]
+            
+            # 解码编码字段 - 逐字解码
+            j = 0
+            code_chars = []
+            while j < len(code_raw):
+                ch = code_raw[j:j+2]
+                if ch == b'\x00\x00':
+                    j += 2
+                    break
                 else:
-                    real_code = code_raw.decode('utf-16le', errors='replace')
-                    phrase_part1 = ""
-                
-                phrase_part2 = phrase_raw.decode('utf-16le', errors='replace')
-                full_phrase = phrase_part1 + phrase_part2
-                
-                full_phrase = full_phrase.strip()
-                real_code = real_code.strip()
-                
-                if full_phrase and real_code:
-                    phrases.append((full_phrase, real_code, order))
+                    try:
+                        decoded = ch.decode('utf-16le')
+                        code_chars.append(decoded)
+                    except Exception:
+                        pass
+                    j += 2
+            
+            # 编码字段中 NULL 之后的内容
+            if j < len(code_raw):
+                rest_raw = code_raw[j:]
+                try:
+                    rest_decoded = rest_raw.decode('utf-16le', errors='replace')
+                except Exception:
+                    rest_decoded = ""
+            else:
+                rest_decoded = ""
+            
+            # 解码短语字段 - 逐字解码
+            phrase_chars = []
+            j = 0
+            while j < len(phrase_raw):
+                ch = phrase_raw[j:j+2]
+                if ch == b'\x00\x00':
+                    j += 2
+                else:
+                    try:
+                        decoded = ch.decode('utf-16le')
+                        phrase_chars.append(decoded)
+                    except Exception:
+                        pass
+                    j += 2
+            
+            # 构建完整短语
+            code = ''.join(code_chars)
+            full_phrase = rest_decoded + ''.join(phrase_chars)
+            
+            if full_phrase and code:
+                phrases.append((full_phrase, code, order))
         
         return phrases
     
