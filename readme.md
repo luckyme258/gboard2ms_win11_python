@@ -6,7 +6,14 @@
 
 演示放在哔哩哔哩了
 
+<<<<<<< HEAD
 [//player.bilibili.com/player.html?isOutside=true&aid=116697432332055&bvid=BV1tj7k6VEeh&cid=38887886665&p=1](https://www.bilibili.com/video/BV1tj7k6VEeh/)
+=======
+
+【使用演示：Gboard自定义词典编辑器 [谷歌输入法（安卓）与微软输入法（Windows）]】 https://www.bilibili.com/video/BV1tj7k6VEeh
+
+
+>>>>>>> 60f03d01404cc88940c322f3a55a5ac66daef1f0
 
 ## 二、安装与运行
 
