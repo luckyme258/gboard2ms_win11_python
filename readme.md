@@ -6,14 +6,11 @@
 
 演示放在哔哩哔哩了
 
-<<<<<<< HEAD
-[//player.bilibili.com/player.html?isOutside=true&aid=116697432332055&bvid=BV1tj7k6VEeh&cid=38887886665&p=1](https://www.bilibili.com/video/BV1tj7k6VEeh/)
-=======
 
-【使用演示：Gboard自定义词典编辑器 [谷歌输入法（安卓）与微软输入法（Windows）]】 https://www.bilibili.com/video/BV1tj7k6VEeh
+【使用演示：Gboard自定义词典编辑器 [谷歌输入法（安卓）与微软输入法（Windows）]】
+ https://www.bilibili.com/video/BV1tj7k6VEeh
 
 
->>>>>>> 60f03d01404cc88940c322f3a55a5ac66daef1f0
 
 ## 二、安装与运行
 
@@ -25,7 +22,7 @@ python ms_manager.py
 ### 方式二：直接运行 exe
 双击 `微软拼音词库管理器.exe` 即可运行。
 
-**注意**：`book.txt` 必须与 exe 放在同一目录下。
+**注意**：`book.txt` 文件自动生成，与 exe 放在同一目录下。
 
 ## 三、主界面
 
