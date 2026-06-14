@@ -8,8 +8,7 @@
 
 
 【使用演示：Gboard自定义词典编辑器 [谷歌输入法（安卓）与微软输入法（Windows）]】
-<iframe src="//player.bilibili.com/player.html?isOutside=true&aid=116697432332055&bvid=BV1tj7k6VEeh&cid=38887886665&p=1" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true"></iframe>
-
+[![项目演示](https://i0.hdslb.com/bfs/archive/xxx.jpg)](https://www.bilibili.com/video/BV1tj7k6VEeh/)
 
 
 ## 二、安装与运行
