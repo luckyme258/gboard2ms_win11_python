@@ -6,10 +6,9 @@
 
 演示放在哔哩哔哩了
 
+使用演示：Gboard自定义词典编辑器 [谷歌输入法（安卓）与微软输入法（Windows）]
 
-【使用演示：Gboard自定义词典编辑器 [谷歌输入法（安卓）与微软输入法（Windows）]】
-[![项目演示](https://i0.hdslb.com/bfs/archive/xxx.jpg)](https://www.bilibili.com/video/BV1tj7k6VEeh/)
-
+[▶️ 点击观看使用演示（B站）](https://www.bilibili/video/BV1tj7k6VEeh/)
 
 ## 二、安装与运行
 
