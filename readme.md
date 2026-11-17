@@ -33,6 +33,8 @@ python ms_manager.py
 ### 方式二：直接运行 exe
 双击 `微软拼音词库管理器.exe` 即可运行。
 
+> 目前 Releases 上的 **v1.0 是源码版，暂无官方 exe**；如需 exe，可自行用 PyInstaller 打包本仓库的 `ms_manager.py`。
+
 **注意**：`book.txt` 文件自动生成，与 exe 放在同一目录下。
 
 ## 三、主界面
@@ -257,6 +259,8 @@ python ms_manager.py
 
 ### Option 2: run the executable
 Double-click `微软拼音词库管理器.exe`.
+
+> The **v1.0 release is source-only — there is no official exe yet**. If you need one, build it yourself from `ms_manager.py` with PyInstaller.
 
 **Note**: `book.txt` is created automatically next to the program.
 
