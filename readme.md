@@ -2,6 +2,10 @@
 
 # 微软拼音词库管理器 使用手册
 
+> **⬇️ 下载最新版**：请到 [Releases](https://github.com/luckyme258/gboard2ms_win11/releases/latest) 下载 **v1.0**。
+>
+> **⚠️ v0.1 / v0.2 已停止维护**：这两个旧版的 Gboard 导出还是旧格式 txt，导入新版安卓 Gboard 只会得到**空词典**，请勿下载使用。
+
 ## 一、简介
 
 微软拼音词库管理器是一个图形化工具，用于管理输入法的自定义短语词库，在内置的 `book.txt` 里统一维护一套条目，再分别导出到两套输入法：
@@ -226,6 +230,10 @@ A: 右上角「Language:」下拉框选 `中文` 即可；这只影响界面显�
 ---
 
 # English Manual
+
+> **⬇️ Download the latest version**: get **v1.0** from [Releases](https://github.com/luckyme258/gboard2ms_win11/releases/latest).
+>
+> **⚠️ v0.1 / v0.2 are no longer maintained**: they still export the legacy txt format, which imports as an **empty dictionary** on the current Android Gboard. Do not download them.
 
 **English** ｜ [中文](#微软拼音词库管理器-使用手册)
 
