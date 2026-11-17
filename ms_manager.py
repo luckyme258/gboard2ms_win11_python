@@ -47,7 +47,7 @@ UI_TEXT = {
         "search": "搜索:",
         "add": "添加",
         "delete": "删除",
-        "import_gboard": "导入 Gboard",
+        "import_gboard": "导入 Gboard（zip/txt）",
         "import_dat": "导入 DAT",
         "export_gboard": "导出 Gboard",
         "export_dat": "导出 DAT",
@@ -82,9 +82,19 @@ UI_TEXT = {
         "err_dup_entry": "短语 '{phrase}' 与编码 '{code}' 已存在",
         "import_done_title": "导入完成",
         "import_done_msg": "成功导入 {n} 条新短语",
+        "import_done_msg2": "从 {files} 个文件导入 {n} 条（{detail}{legacy}），跳过重复 {dup} 条",
+        "import_legacy_part": "，其中旧格式 {n} 条",
         "import_none": "未从文件中解析到有效条目",
         "import_enc_err": "文件编码错误，请确保文件是 UTF-8 编码的文本文件",
-        "import_gboard_title": "选择 Gboard 导出的文件",
+        "import_zip_bad": "无法读取该 zip 文件：{err}",
+        "not_zip": "不是有效的 zip 文件",
+        "import_all_dup": "没有新增条目：{dup} 条已存在于词库中",
+        "import_zip_encrypted": "{name}：条目已加密，已跳过",
+        "import_file_skip": "{name}：内容无法解码，已跳过",
+        "import_zip_limit": "zip 内容超出限制（上限 {limit} 个文件 / 20 MB），已中止",
+        "import_header_warn": "{name} 缺少 version:2 头部，已按宽松方式解析",
+        "import_skip_rows": "另有 {n} 行格式不符已被跳过",
+        "import_gboard_title": "选择 Gboard 词典文件（zip 优先，兼容旧 txt）",
         "select_dat_title": "选择微软拼音 DAT 文件",
         "export_empty": "词库为空，无法导出",
         "ask_export_gboard": "导出为 Gboard 词典包",
@@ -117,7 +127,7 @@ UI_TEXT = {
         "search": "Search:",
         "add": "Add",
         "delete": "Delete",
-        "import_gboard": "Import Gboard",
+        "import_gboard": "Import Gboard (zip/txt)",
         "import_dat": "Import DAT",
         "export_gboard": "Export Gboard",
         "export_dat": "Export DAT",
@@ -152,9 +162,19 @@ UI_TEXT = {
         "err_dup_entry": "Phrase '{phrase}' with shortcut '{code}' already exists",
         "import_done_title": "Import finished",
         "import_done_msg": "Imported {n} new entries",
+        "import_done_msg2": "Imported {n} entries from {files} file(s) ({detail}{legacy}); {dup} duplicates skipped",
+        "import_legacy_part": "; {n} legacy-format",
         "import_none": "No valid entry found in the file",
         "import_enc_err": "Encoding error: the file must be UTF-8 text",
-        "import_gboard_title": "Select a Gboard exported file",
+        "import_zip_bad": "Cannot read this zip file: {err}",
+        "not_zip": "not a valid zip file",
+        "import_all_dup": "Nothing new: {dup} entries already exist in the dictionary",
+        "import_zip_encrypted": "{name}: encrypted entry skipped",
+        "import_file_skip": "{name}: could not decode, skipped",
+        "import_zip_limit": "The zip is too large (limit {limit} files / 20 MB), aborted",
+        "import_header_warn": "{name} lacks the version:2 header, parsed leniently",
+        "import_skip_rows": "{n} malformed lines skipped",
+        "import_gboard_title": "Select a Gboard dictionary file (zip preferred, legacy txt accepted)",
         "select_dat_title": "Select a Microsoft Pinyin DAT file",
         "export_empty": "The dictionary is empty, nothing to export",
         "ask_export_gboard": "Export Gboard dictionary package",
@@ -381,12 +401,13 @@ class MsPhraseManager:
             for item in selected:
                 values = self.tree.item(item, "values")
                 if values and len(values) >= 3:
-                    to_delete.append((values[0], values[1], int(values[2])))
+                    # 表格列序：短语、编码、候选位置 -> 内存顺序：编码、短语、位置
+                    to_delete.append((values[1], values[0], int(values[2])))
             
             # 从数据中删除
-            for phrase, code, pos in to_delete:
-                for i, (p, c, position) in enumerate(self.phrases):
-                    if p == phrase and c == code and position == pos:
+            for code, phrase, pos in to_delete:
+                for i, (c, p, position) in enumerate(self.phrases):
+                    if c == code and p == phrase and position == pos:
                         del self.phrases[i]
                         break
             
@@ -412,12 +433,13 @@ class MsPhraseManager:
                         continue
                     parts = line.split('\t')
                     if len(parts) >= 2:
-                        phrase = parts[0].strip()
-                        code = parts[1].strip()
+                        # 约定：首列是编码（shortcut），次列是短语（word）
+                        code = parts[0].strip()
+                        phrase = parts[1].strip()
                         position = 1
                         if len(parts) >= 3 and parts[2].strip().isdigit():
                             position = int(parts[2].strip())
-                        self.phrases.append((phrase, code, position))
+                        self.phrases.append((code, phrase, position))
             self.status.config(text=self.t("status_loaded", n=len(self.phrases)))
         except Exception as e:
             messagebox.showerror(self.t("load_fail_title"), self.t("load_fail_msg", err=e))
@@ -436,10 +458,10 @@ class MsPhraseManager:
                 f.write("# 微软拼音词库 - 统一格式\n")
                 f.write(f"# 更新时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
                 f.write(f"# 总计: {len(self.phrases)} 条\n")
-                f.write("# 格式: 短语\t编码\t候选位置\n")
+                f.write("# 格式: 编码\t短语\t候选位置\n")
                 f.write("#" + "-" * 50 + "\n")
-                for phrase, code, position in self.phrases:
-                    f.write(f"{phrase}\t{code}\t{position}\n")
+                for code, phrase, position in self.phrases:
+                    f.write(f"{code}\t{phrase}\t{position}\n")
             
             self.status.config(text=self.t("status_saved", n=len(self.phrases)))
             messagebox.showinfo(self.t("save_ok_title"), self.t("save_ok_msg", n=len(self.phrases)))
@@ -449,7 +471,7 @@ class MsPhraseManager:
     def update_stats(self):
         """更新统计信息"""
         code_count = defaultdict(int)
-        for _, code, _ in self.phrases:
+        for code, _, _ in self.phrases:
             code_count[code] += 1
         multi_codes = {k: v for k, v in code_count.items() if v > 1}
         
@@ -471,7 +493,7 @@ class MsPhraseManager:
     def update_tree(self):
         for row in self.tree.get_children():
             self.tree.delete(row)
-        for phrase, code, position in self.filtered:
+        for code, phrase, position in self.filtered:
             self.tree.insert("", tk.END, values=(phrase, code, position))
     
     def on_search(self, event=None):
@@ -506,11 +528,11 @@ class MsPhraseManager:
             if not phrase or not code:
                 messagebox.showerror(self.t("error"), self.t("err_fields_empty"))
                 return
-            for p, c, pos in self.phrases:
+            for c, p, pos in self.phrases:
                 if p == phrase and c == code:
                     messagebox.showerror(self.t("error"), self.t("err_dup_entry", phrase=phrase, code=code))
                     return
-            self.phrases.append((phrase, code, position))
+            self.phrases.append((code, phrase, position))
             self.refresh_display()
             self.update_stats()
             dialog.destroy()
@@ -562,12 +584,12 @@ class MsPhraseManager:
             if not new_phrase or not new_code:
                 messagebox.showerror(self.t("error"), self.t("err_fields_empty"))
                 return
-            for i, (p, c, pos) in enumerate(self.phrases):
-                if p == new_phrase and c == new_code and not (p == old_phrase and c == old_code):
+            for i, (c, p, pos) in enumerate(self.phrases):
+                if c == new_code and p == new_phrase and not (c == old_code and p == old_phrase):
                     messagebox.showerror(self.t("error"), self.t("err_dup_entry", phrase=new_phrase, code=new_code))
                     return
-                if p == old_phrase and c == old_code and pos == old_position:
-                    self.phrases[i] = (new_phrase, new_code, new_position)
+                if c == old_code and p == old_phrase and pos == old_position:
+                    self.phrases[i] = (new_code, new_phrase, new_position)
                     break
             self.refresh_display()
             self.update_stats()
@@ -576,58 +598,189 @@ class MsPhraseManager:
         ttk.Button(dialog, text=self.t("btn_ok"), command=save).grid(row=3, column=0, pady=10)
         ttk.Button(dialog, text=self.t("btn_cancel"), command=dialog.destroy).grid(row=3, column=1, pady=10)
     
-    # ========== 导入 Gboard TXT ==========
-    
+    # ========== 导入 Gboard（zip 为准，兼容旧 txt）==========
+
+    MAX_ZIP_FILES = 50
+    MAX_ZIP_BYTES = 20 * 1024 * 1024
+
+    @staticmethod
+    def _decode_gboard_bytes(raw):
+        """按 utf-8-sig → utf-8 解码；都失败返回 (None, True)"""
+        for enc in ("utf-8-sig", "utf-8"):
+            try:
+                return raw.decode(enc), False
+            except UnicodeDecodeError:
+                continue
+        return None, True
+
+    @classmethod
+    def _parse_gboard_rows(cls, text, legacy=False):
+        """
+        解析 Gboard 词典文本 -> [(shortcut, word, pos|None), ...]
+        zip 内走严格路径（legacy=False）；旧 txt 走兼容路径（legacy=True）
+        返回 (rows, skipped_lines)
+        """
+        rows, skipped = [], 0
+        for raw_line in text.splitlines():
+            line = raw_line.replace("\ufeff", "").rstrip()
+            if not line.strip() or line.lstrip().startswith("#"):
+                continue
+            parts = [p.strip() for p in line.split("\t")]
+            if len(parts) < 2:
+                skipped += 1
+                continue
+            shortcut, word = parts[0], parts[1]
+            tag = parts[2] if len(parts) >= 3 else ""
+            pos_raw = parts[3] if len(parts) >= 4 else ""
+            pos = int(pos_raw) if pos_raw.isdigit() and 1 <= int(pos_raw) <= 9 else None
+            if legacy and not tag:
+                # 旧写法：语言标签可能粘在词尾（仅兼容层启用，新格式禁用）
+                word = re.sub(r'\s*(zh-CN|zh-TW|zh-HK|en-US|ja-JP)\s*$', '', word,
+                              flags=re.IGNORECASE)
+            if shortcut and word:
+                rows.append((shortcut, word, pos))
+            else:
+                skipped += 1
+        return rows, skipped
+
+    def _read_gboard_zip(self, filepath):
+        """
+        读 zip 词典包：按内容识别，不依赖文件名
+        返回 (rows, meta)；meta = {files, legacy, skipped, warnings, header_warn}
+        超限抛 ValueError("zip_files"/"zip_size")
+        """
+        rows, warnings, header_warn = [], [], []
+        files = skipped = 0
+        header_line = self.GBOARD_HEADER.splitlines()[0]
+
+        with zipfile.ZipFile(filepath) as z:
+            infos = [i for i in z.infolist() if not i.is_dir()]
+            infos = [i for i in infos
+                     if not i.filename.startswith("__MACOSX/")
+                     and not Path(i.filename).name.startswith(".")]
+            if len(infos) > self.MAX_ZIP_FILES:
+                raise ValueError("zip_files")
+            if sum(i.file_size for i in infos) > self.MAX_ZIP_BYTES:
+                raise ValueError("zip_size")
+
+            infos.sort(key=lambda i: i.filename.lower())  # 顺序稳定
+            for info in infos:
+                name = Path(info.filename).name
+                if info.flag_bits & 0x1:                  # 加密条目
+                    warnings.append(self.t("import_zip_encrypted", name=name))
+                    continue
+                try:
+                    raw = z.read(info)
+                except RuntimeError:                      # 加密 / 读取失败
+                    warnings.append(self.t("import_zip_encrypted", name=name))
+                    continue
+
+                text, bad = self._decode_gboard_bytes(raw)
+                if bad:
+                    warnings.append(self.t("import_file_skip", name=name))
+                    continue
+                if not text.strip():
+                    continue
+                if header_line not in text:
+                    header_warn.append(name)
+
+                part, skipped_lines = self._parse_gboard_rows(text, legacy=False)
+                skipped += skipped_lines
+                if not part:
+                    continue
+                files += 1
+                rows.extend(part)
+
+        meta = {"files": files, "legacy": 0, "skipped": skipped,
+                "warnings": warnings, "header_warn": header_warn}
+        return rows, meta
+
     def import_gboard(self):
-        """导入 Gboard 格式文件 (编码\t短语)"""
+        """导入 Gboard 词典：以 zip 词典包为准，兼容旧 txt"""
         filepath = filedialog.askopenfilename(
             title=self.t("import_gboard_title"),
-            filetypes=[(self.t("ft_txt"), "*.txt"), (self.t("ft_all"), "*.*")]
+            filetypes=[
+                (self.t("ft_zip") + " (*.zip)", "*.zip"),
+                (self.t("ft_txt") + " (*.txt)", "*.txt"),
+                (self.t("ft_all"), "*.*"),
+            ]
         )
         if not filepath:
             return
-        
-        new_entries = []
+
+        rows, meta = [], {"files": 0, "legacy": 0, "skipped": 0,
+                          "warnings": [], "header_warn": []}
         try:
-            with open(filepath, 'r', encoding='utf-8') as f:
-                for line in f:
-                    line = line.strip()
-                    if not line or line.startswith('#'):
-                        continue
-                    parts = line.split('\t')
-                    if len(parts) >= 2:
-                        code = parts[0].strip()
-                        phrase = parts[1].strip()
-                        phrase = re.sub(r'\s*(zh-CN|zh-TW|zh-HK|en-US|ja-JP)\s*$', '', phrase, flags=re.IGNORECASE)
-                        if code and phrase:
-                            new_entries.append((phrase, code))
-        except UnicodeDecodeError:
-            messagebox.showerror(self.t("error"), self.t("import_enc_err"))
+            if zipfile.is_zipfile(filepath):
+                rows, meta = self._read_gboard_zip(filepath)
+            elif filepath.lower().endswith(".zip"):
+                messagebox.showerror(self.t("error"),
+                                     self.t("import_zip_bad", err=self.t("not_zip")))
+                return
+            else:
+                with open(filepath, "rb") as f:
+                    raw = f.read()
+                text, bad = self._decode_gboard_bytes(raw)
+                if bad:
+                    messagebox.showerror(self.t("error"), self.t("import_enc_err"))
+                    return
+                part, skipped = self._parse_gboard_rows(text, legacy=True)
+                rows = part
+                meta = {"files": 1 if part else 0, "legacy": len(part),
+                        "skipped": skipped, "warnings": [], "header_warn": []}
+        except ValueError:
+            messagebox.showerror(
+                self.t("error"), self.t("import_zip_limit", limit=str(self.MAX_ZIP_FILES)))
             return
-        
-        if not new_entries:
+        except (zipfile.BadZipFile, OSError) as e:
+            messagebox.showerror(self.t("error"), self.t("import_zip_bad", err=e))
+            return
+
+        rows = [(s, w, p) for s, w, p in rows if s and w]
+        if not rows:
             messagebox.showwarning(self.t("warning"), self.t("import_none"))
             return
-        
-        existing_set = {(p, c) for p, c, _ in self.phrases}
-        added = 0
-        for phrase, code in new_entries:
-            if (phrase, code) in existing_set:
+
+        # 内部约定：元素0 = shortcut（编码），元素1 = word（短语）
+        existing = {(s, w) for s, w, _ in self.phrases}
+        added, dup = 0, 0
+        lang_count = {"zh-CN": 0, "zz": 0}
+        for shortcut, word, pos in rows:
+            if (shortcut, word) in existing:
+                dup += 1
                 continue
-            max_pos = 0
-            for p, c, pos in self.phrases:
-                if c == code and pos > max_pos:
-                    max_pos = pos
-            position = max_pos + 1
-            if position > 9:
-                position = 9
-            self.phrases.append((phrase, code, position))
-            existing_set.add((phrase, code))
+            if pos:
+                position = min(pos, 9)
+            else:
+                max_pos = 0
+                for s2, _w2, p2 in self.phrases:
+                    if s2 == shortcut and p2 > max_pos:
+                        max_pos = p2
+                position = min(max_pos + 1, 9)
+            self.phrases.append((shortcut, word, position))
+            existing.add((shortcut, word))
+            lang_count[self._gboard_lang_tag(word)] += 1
             added += 1
-        
+
         self.refresh_display()
         self.update_stats()
-        messagebox.showinfo(self.t("import_done_title"), self.t("import_done_msg", n=added))
+
+        detail = self.t("list_sep").join(
+            self.t("lang_detail", tag=tag, n=n) for tag, n in lang_count.items() if n)
+        legacy = self.t("import_legacy_part", n=meta["legacy"]) if meta.get("legacy") else ""
+        if added:
+            msg = self.t("import_done_msg2", files=meta.get("files", 0), n=added,
+                         detail=detail, legacy=legacy, dup=dup)
+        else:
+            msg = self.t("import_all_dup", dup=dup)
+        if meta.get("skipped"):
+            msg += "\n\n" + self.t("import_skip_rows", n=meta["skipped"])
+        if meta.get("header_warn"):
+            msg += "\n\n" + self.t("import_header_warn",
+                                   name=self.t("list_sep").join(meta["header_warn"]))
+        if meta.get("warnings"):
+            msg += "\n\n" + "\n".join(meta["warnings"])
+        messagebox.showinfo(self.t("import_done_title"), msg)
     
     # ========== 导入微软拼音 DAT（严格按照 dat2txt.py 的逻辑）==========
     
@@ -761,13 +914,13 @@ class MsPhraseManager:
             messagebox.showwarning(self.t("warning"), self.t("import_none"))
             return
         
-        existing_set = {(p, c) for p, c, _ in self.phrases}
+        existing_set = {(c, p) for c, p, _ in self.phrases}
         added = 0
         for phrase, code, position in new_entries:
-            if (phrase, code) in existing_set:
+            if (code, phrase) in existing_set:
                 continue
-            self.phrases.append((phrase, code, position))
-            existing_set.add((phrase, code))
+            self.phrases.append((code, phrase, position))
+            existing_set.add((code, phrase))
             added += 1
         
         self.refresh_display()
@@ -867,7 +1020,7 @@ class MsPhraseManager:
         entry_offsets = []
         current_offset = 0
         
-        for phrase, code, position in entries:
+        for code, phrase, position in entries:
             if len(phrase) >= 2:
                 phrase_part1 = phrase[:2]
                 phrase_part2 = phrase[2:]

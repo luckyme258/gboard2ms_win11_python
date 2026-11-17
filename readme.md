@@ -13,7 +13,7 @@
 - **Gboard（安卓）**：导出为新版 Gboard 词典包（`.zip`，内含按语言拆分的 `dictionary_*.txt`），可直接在手机 Gboard 的个人词典里导入
 - **微软拼音（Windows）**：导出为 `.dat`，可在微软拼音的用户自定义短语里导入
 
-同时支持从 Gboard 导出的文本词库、微软拼音的 `.dat` 反向导入。
+同时支持反向导入：**直接导入手机导出的 Gboard 词典 zip**（不必解压），或导入旧的纯文本词库、微软拼音的 `.dat`。
 
 **界面支持中文 / English 两种语言**：启动时按系统语言自动选择，也可在窗口右上角随时手动切换。
 
@@ -41,24 +41,24 @@ python ms_manager.py
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│ 搜索: [        ] [添加] [删除] [导入 Gboard] [导入 DAT] [导出 Gboard] [导出 DAT] [保存] [打开文件夹]      语言: [中文 ▾] │
+│ 搜索: [        ] [添加] [删除] [导入 Gboard（zip/txt）] [导入 DAT] [导出 Gboard] [导出 DAT] [保存] [打开文件夹]      语言: [中文 ▾] │
 ├──────────────────────────────────────────────────────────────────────────────┤
-│ 总计: 33 条 | 唯一编码: 33 个 | 重复编码: 0 个                                  │
+│ 总计: 32 条 | 唯一编码: 31 个 | 重复编码: 1 个                                  │
 ├──────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  短语              │ 编码            │ 候选位置                                  │
 │  ─────────────────┼────────────────┼─────────────────────────────────────── │
-│  ad               │ adb devices    │ 1                                        │
-│  xm               │ 小米9           │ 1                                        │
-│  gp               │ git push       │ 1                                        │
+│  adb devices      │ ad             │ 1                                        │
+│  小米9             │ xm             │ 1                                        │
+│  git push         │ gp             │ 1                                        │
 │  ...              │ ...            │ ...                                      │
 │                                                                              │
 ├──────────────────────────────────────────────────────────────────────────────┤
-│ 显示 33 / 33 条                                                    就绪        │
+│ 显示 32 / 32 条                                                    就绪        │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-> 界面列标题是「短语 | 编码」，但**当前 `book.txt` 的实际列序是「编码在前、短语在后」**，所以表格里「短语」列显示的是编码、「编码」列显示的是短语。原因与处理见第七章「book.txt 的列序问题」。
+> 表格列序与 `book.txt` 的存储顺序是分开的两件事：表格**按「短语在前、编码在后」显示**，`book.txt` **按「编码在前、短语在后」保存**。程序内部统一以「第 1 列 = 编码（shortcut）、第 2 列 = 短语（word）」为唯一约定，详见第七章。
 
 ### 3.1 界面语言（右上角）
 
@@ -100,12 +100,15 @@ python ms_manager.py
 
 ### 5.1 导入 Gboard 词库
 1. 在手机上打开 Gboard 设置 → 词典 → 个人词典 → 导出，得到一个 `PersonalDictionary-*.zip`
-2. **先解压**，取出里面的 `dictionary.txt`（本工具目前只读文本文件，不解压 zip）
-3. 把这个 `.txt` 传到电脑
-4. 点击「导入 Gboard」，选择该文件
-5. 程序自动去重合并；同编码的多条会按候选位置依次往后排（上限 9）
+2. 把这个 **zip 原样**传到电脑（不需要解压，程序会自己读里面的 `dictionary_*.txt`）
+3. 点击「导入 Gboard（zip/txt）」，选择该 zip
+4. 程序自动按语言分组读入、去重合并；同编码的多条会按候选位置依次往后排（上限 9）
 
-> 新版 Gboard 导出的 txt 第 1 行是 `# Gboard Dictionary version:2`，第 2 行是格式声明，条目为 `编码 → 短语 → 语言标签 → 候选标记` 四列。导入时程序会自动跳过 `#` 开头的头行、剥掉尾部的语言标签。
+> - zip 里的文件按内容识别，文件名不必严格叫 `dictionary_zh-CN.txt`；`__MACOSX/`、隐藏文件、目录项会自动跳过
+> - 单个 zip 限制 50 个文件 / 20 MB，超限会直接中止并提示，不写入任何数据
+> - 仍然兼容旧的纯文本词库：单个 `dictionary.txt` / 2 列旧格式 `.txt` 也能导入，提示里会标注「其中旧格式 N 条」
+> - 新版格式：第 1 行 `# Gboard Dictionary version:2`，第 2 行格式声明，条目为 `编码 → 短语 → 语言标签 → 候选标记` 四列，行尾保留 Tab
+> - 缺少 `version:2` 头部会照常解析，但会在结果提示里给出告警
 
 ### 5.2 导入微软拼音 DAT
 1. 在微软拼音设置中导出用户自定义短语（得到 `.dat` 文件）
@@ -150,37 +153,32 @@ Gboard_Dictionary_20261117_223000.zip
 
 ## 七、book.txt 格式
 
-内部格式为 Tab 分隔的三列，程序按「第 1 列、第 2 列、第 3 列」依次读写：
+内部格式为 Tab 分隔的三列，**第 1 列是编码（shortcut）、第 2 列是短语（word）、第 3 列是候选位置**，程序内部只有这一种约定：
 
 ```
 # 微软拼音词库 - 统一格式
-# 更新时间: 2026-11-17 22:30:00
+# 更新时间: 2026-11-18 01:10:00
 # 总计: 3 条
-# 格式: 短语	编码	候选位置
+# 格式: 编码	短语	候选位置
 #--------------------------------------------------
 ad	adb devices	1
 xm	小米9	1
 gp	git push	1
 ```
 
-### ⚠ book.txt 的列序问题（现状说明）
+### 7.1 列序约定（v1.0 起已统一）
 
-程序文件头里写的注释是「格式: 短语 编码 候选位置」，界面列标题也是「短语 | 编码」，但**本机现有的 `book.txt` 里第 1 列实际是编码**（因为最初的数据来自 Gboard 导入，而导入逻辑把第 1 列当编码写入）。具体表现：
+界面表格按「短语 | 编码 | 候选位置」显示，`book.txt` 按「编码 | 短语 | 候选位置」保存，两者只是显示与存储的差别，内部只有一套顺序，不会再出现显示相反的情况。
 
-| 位置 | 程序以为 | 实际数据 |
-| ---- | -------- | -------- |
-| 第 1 列 | 短语 | 编码（如 `ad`、`xm`） |
-| 第 2 列 | 编码 | 短语（如 `adb devices`、`小米9`） |
-| 第 3 列 | 候选位置 | 候选位置（一致） |
+| 场景 | 取哪一列 | 状态 |
+| ---- | -------- | ---- |
+| 界面表格 | 第 2 列显示在「短语」、第 1 列显示在「编码」 | 正确 |
+| 统计栏「唯一编码 / 重复编码」 | 按第 1 列（编码）统计 | 正确（现为 32 条、31 个唯一、1 组重复 `xm`） |
+| Gboard 导出（zip） | 第 1 列 = shortcut、第 2 列 = word | 正确 |
+| DAT 导出 | 第 1 列 = 编码、第 2 列 = 短语 | 正确 |
+| Gboard 导入 / DAT 导入 | 写回时统一转成「编码在前、短语在后」 | 正确 |
 
-受影响的地方（都源于同一个根因）：
-
-- **Gboard 导出**已按「第 1 列 = shortcut、第 2 列 = 短语」处理，与实际数据一致，实测可正常导入 → **正确**
-- **DAT 导出**按「第 2 列 = 编码、第 1 列 = 短语」处理，与实际数据相反 → 导出的 DAT 里「编码」是长句、「短语」是短码，详见第八章 Q7
-- **统计栏**的「唯一编码 / 重复编码」也按第 2 列统计，所以当前显示「唯一编码 33 个、重复编码 0 个」；按实际的编码列算，应是 32 个唯一、1 组重复（`xm` 两条）
-- **界面**因此把编码显示在「短语」列
-
-统一列序需要动数据或动映射，属于单独一项改动，当前版本未做。
+> 旧版本（6 月发布的 v0.1 / v0.2 exe）存在列序反转：界面把编码显示在「短语」列、DAT 导出把长句写进编码字段、统计栏按短语统计。v1.0 已全部修正。若用旧版导入过词库，请检查 `book.txt` 里是否出现「中文短语在第 1 列」的行——本项目现有 32 条数据经检查全部正常，无需迁移。
 
 ## 八、常见问题
 
@@ -188,10 +186,10 @@ gp	git push	1
 A: 程序会自动创建，首次运行正常现象。
 
 ### Q2: 导入 Gboard 文件提示「编码错误」
-A: 确保文件是 UTF-8 编码的纯文本；如果拿到的是手机导出的 `.zip`，请先解压，导入里面的 `.txt`。
+A: 先确认选的文件本身是不是有效：`.zip` 请直接用手机导出的原始 zip（程序会读包内的 `dictionary_*.txt`，不用先解压）；纯文本请确保是 UTF-8 编码。若提示「不是有效的 zip 文件」，说明文件后缀是 zip 但内容已损坏或被改名。
 
 ### Q3: 导出的 DAT 导入微软拼音后乱码
-A: 检查 `book.txt` 内容是否正确；也请先看 Q7 的列序说明。
+A: 先确认 `book.txt` 内容是否正确（编码在前、短语在后），再用 v1.0 重新导出；旧的 DAT 建议不要再用。
 
 ### Q4: 如何备份词库？
 A: 直接复制 `book.txt`；程序每次保存也会生成 `book.txt.bak`。
@@ -206,7 +204,7 @@ A: 按顺序排查：
 3. 导入后到 Gboard「词典 → 个人词典」确认语言条目是否落在对应词典里
 
 ### Q7: DAT 导入后「输入一长串才出短码」？
-A: 这是当前 `book.txt` 列序与 DAT 导出映射不一致导致的（见第七章）。DAT 导出取的是第 2 列当编码，而现有数据的第 2 列是短语。使用 DAT 前请先统一列序，或等该项修正。
+A: 这是旧版本（v0.1 / v0.2）的列序反转造成的：旧版 DAT 导出把短语当编码写进 DAT。v1.0 已修正，重新导出一次 DAT 即可；旧版导出的 `.dat` 建议丢弃重导。
 
 ### Q8: 界面是英文，能改回中文吗？
 A: 右上角「Language:」下拉框选 `中文` 即可；这只影响界面显示，不影响数据与导出。
@@ -226,8 +224,8 @@ A: 右上角「Language:」下拉框选 `中文` 即可；这只影响界面显�
 ---
 
 **版本**：1.0
-**更新日期**：2026-11-17
-**本次更新**：适配新版 Gboard（`version:2`）词典格式、导出改为 zip 词典包、新增导出后自检、界面支持中文/English 双语。详见《更新日志.md》。
+**更新日期**：2026-11-18
+**本次更新**：适配新版 Gboard（`version:2`）词典格式、导出改为 zip 词典包、**支持直接导入手机导出的 zip**、统一列序（修复表格反序与 DAT 字段反转）、新增导出后自检、界面支持中文/English 双语。详见《更新日志.md》。
 
 ---
 
@@ -246,7 +244,7 @@ Microsoft Pinyin Dictionary Manager is a GUI tool that keeps one single dictiona
 - **Gboard (Android)** — exports a Gboard dictionary package (`.zip` containing per-language `dictionary_*.txt`), which can be imported directly in Gboard's personal dictionary
 - **Microsoft Pinyin (Windows)** — exports a `.dat` file that can be imported as user-defined phrases
 
-It can also import a Gboard exported text dictionary and a Microsoft Pinyin `.dat` file back into `book.txt`.
+It can also import backwards: **the Gboard dictionary zip exported by the phone** (no unzipping needed), legacy plain-text dictionaries, and Microsoft Pinyin `.dat` files.
 
 **The UI is available in Chinese and English**: the language is picked automatically from the system language at startup, and can be switched any time from the top-right corner.
 
@@ -268,17 +266,17 @@ Double-click `微软拼音词库管理器.exe`.
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
-│ Search: [      ] [Add] [Delete] [Import Gboard] [Import DAT] [Export Gboard] [Export DAT] [Save] [Open Folder]      Language: [English ▾] │
+│ Search: [      ] [Add] [Delete] [Import Gboard (zip/txt)] [Import DAT] [Export Gboard] [Export DAT] [Save] [Open Folder]      Language: [English ▾] │
 ├────────────────────────────────────────────────────────────────────────────┤
-│ Total: 33 | Unique shortcuts: 33 | Duplicated: 0                            │
+│ Total: 32 | Unique shortcuts: 31 | Duplicated: 1                            │
 ├────────────────────────────────────────────────────────────────────────────┤
 │   Phrase    │ Shortcut       │ Position                                     │
 │  ───────────┼────────────────┼────────────────────────────────────────────  │
-│   ad        │ adb devices    │ 1                                           │
-│   xm        │ 小米9           │ 1                                           │
-│   gp        │ git push       │ 1                                           │
+│   adb devices │ ad           │ 1                                           │
+│   小米9        │ xm           │ 1                                           │
+│   git push  │ gp             │ 1                                           │
 ├────────────────────────────────────────────────────────────────────────────┤
-│ Showing 33 / 33                                                  Ready      │
+│ Showing 32 / 32                                                  Ready      │
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -321,12 +319,15 @@ Type in the search box to filter entries live (matches either the phrase or the 
 
 ### 5.1 Import a Gboard dictionary
 1. On the phone: Gboard → Dictionary → Personal dictionary → Export, which produces `PersonalDictionary-*.zip`
-2. **Unzip it first** and take out the inner `dictionary.txt` (this tool reads plain text only, it does not unzip archives)
-3. Copy the `.txt` to the PC
-4. Click **Import Gboard** and pick the file
-5. Entries are merged with de-duplication; entries sharing the same shortcut are appended with increasing positions (max 9)
+2. Copy that **zip as-is** to the PC — no need to unzip; the tool reads the inner `dictionary_*.txt` itself
+3. Click **Import Gboard (zip/txt)** and pick the zip
+4. Entries are grouped by language, merged with de-duplication; entries sharing the same shortcut are appended with increasing positions (max 9)
 
-> A dictionary exported by the new Gboard starts with `# Gboard Dictionary version:2` and a format line; each entry has four tab-separated fields: `shortcut → word → language_tag → pos_tag`. The importer skips `#` header lines and strips the trailing language tag.
+> - Files inside the zip are recognised by content, so they do not have to be named `dictionary_zh-CN.txt` exactly; `__MACOSX/`, hidden files and directory entries are skipped
+> - A single zip is limited to 50 files / 20 MB; anything larger aborts with an error and nothing is written
+> - Legacy plain-text dictionaries still import: a single `dictionary.txt` or an old two-column `.txt` works, and the result message marks "N legacy row(s)"
+> - New format: `# Gboard Dictionary version:2` on line 1, the format line on line 2, then four tab-separated fields `shortcut → word → language_tag → pos_tag` with a trailing tab
+> - A missing `version:2` header is still parsed, but the result message warns about it
 
 ### 5.2 Import a Microsoft Pinyin DAT
 1. Export the user-defined phrases from Microsoft Pinyin settings (a `.dat` file)
@@ -371,31 +372,32 @@ Gboard_Dictionary_20261117_223000.zip
 
 ## 7. book.txt format
 
-Three tab-separated columns, read and written in order:
+Three tab-separated columns: **column 1 = shortcut, column 2 = phrase (word), column 3 = position**. This is the only internal convention the program uses.
 
 ```
 # 微软拼音词库 - 统一格式
-# 更新时间: 2026-11-17 22:30:00
+# 更新时间: 2026-11-18 01:10:00
 # 总计: 3 条
-# 格式: 短语	编码	候选位置
+# 格式: 编码	短语	候选位置
 #--------------------------------------------------
 ad	adb devices	1
 xm	小米9	1
 gp	git push	1
 ```
 
-### ⚠ Known column-order issue
+### 7.1 Column order (unified as of v1.0)
 
-The header written by the program says "phrase, shortcut, position" and the table headers say "Phrase | Shortcut", but **in the current `book.txt` the first column actually holds the shortcut** (the data originated from a Gboard import, which stores the first field as the shortcut).
+The table displays "Phrase | Shortcut | Position" while `book.txt` stores "shortcut | phrase | position" — that is only a display/storage difference; internally there is a single order, so the reversed display of older builds cannot happen.
 
-Consequences (all from the same root cause):
+| Where | Which column is used | Status |
+| --- | --- | --- |
+| Table | column 2 shown under "Phrase", column 1 under "Shortcut" | correct |
+| Stats bar (unique / duplicated shortcuts) | counted on column 1 | correct (currently 32 entries, 31 unique, 1 duplicate `xm`) |
+| Gboard export (zip) | column 1 = shortcut, column 2 = word | correct |
+| DAT export | column 1 = shortcut, column 2 = phrase | correct |
+| Gboard import / DAT import | normalised to "shortcut first, phrase second" when written back | correct |
 
-- **Gboard export** treats column 1 as the shortcut and column 2 as the phrase, which matches the real data → verified working
-- **DAT export** treats column 2 as the shortcut and column 1 as the phrase → the DAT ends up with the long phrase as shortcut and the short code as phrase (see Q7)
-- **The stats bar** counts unique/duplicated shortcuts on column 2, so it currently shows "unique 33, duplicated 0"; counting the real shortcut column it would be 32 unique with one duplicate (`xm` twice)
-- **The table** therefore shows the shortcut under the "Phrase" header
-
-Unifying the column order requires either migrating the data or changing the mappings; that is a separate change and is **not** done in this version.
+> Builds v0.1 / v0.2 (June) had the reversal: the table showed shortcuts under "Phrase", DAT export wrote the long phrase into the shortcut field, and the stats bar counted phrases. v1.0 fixes all of it. If you imported data with an old build, check whether any row has a Chinese phrase in column 1 — the 32 entries shipped here were audited and are all fine, so no migration is needed.
 
 ## 8. FAQ
 
@@ -403,10 +405,10 @@ Unifying the column order requires either migrating the data or changing the map
 A: It is created automatically; this is normal on first run.
 
 ### Q2: "Encoding error" when importing a Gboard file
-A: Make sure it is UTF-8 plain text. If you have the `.zip` exported by the phone, unzip it first and import the inner `.txt`.
+A: First check the file itself: for a `.zip`, use the original zip exported by the phone (the tool reads the inner `dictionary_*.txt`, no unzipping needed); for plain text, make sure it is UTF-8. An error saying it is not a valid zip means the extension says zip but the archive is corrupt or was renamed.
 
 ### Q3: Garbled text after importing the DAT into Microsoft Pinyin
-A: Check the contents of `book.txt`, and read Q7 about the column order first.
+A: Check that `book.txt` has shortcut first, phrase second, then re-export with v1.0; discard DAT files produced by older builds.
 
 ### Q4: How do I back up my dictionary?
 A: Copy `book.txt`. Every save also produces `book.txt.bak`.
@@ -421,7 +423,7 @@ A: Check in this order:
 3. In Gboard → Dictionary → Personal dictionary, check which dictionary the entries landed in
 
 ### Q7: In the DAT, typing a long string produces a short code
-A: This comes from the column-order mismatch described in section 7 — DAT export takes column 2 as the shortcut while the real data has the phrase there. Unify the column order before relying on DAT export.
+A: That is the reversal of builds v0.1 / v0.2, which wrote the phrase into the DAT shortcut field. v1.0 fixes it — just export the DAT again; DAT files from older builds should be discarded.
 
 ### Q8: The UI is in English, can I get Chinese back?
 A: Pick `中文` in the `Language:` dropdown at the top-right. It only affects the interface, not your data or the exports.
@@ -441,5 +443,5 @@ Issues and suggestions are welcome.
 ---
 
 **Version**: 1.0
-**Date**: 2026-11-17
-**This release**: Gboard `version:2` dictionary format support, zip export, post-export self-check, and a bilingual (Chinese / English) UI.
+**Date**: 2026-11-18
+**This release**: Gboard `version:2` dictionary format support, zip export, **direct import of the phone-exported zip**, unified column order (table display and DAT fields fixed), post-export self-check, and a bilingual (Chinese / English) UI.
