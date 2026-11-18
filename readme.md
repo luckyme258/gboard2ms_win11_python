@@ -1,8 +1,10 @@
 **中文** ｜ [English](#english-manual)
 
+> ℹ️ **新版已迁移到 Go**：单个 exe（约 6.7 MB）、无需 Python 环境，见 [luckyme258/gboard2ms_win11](https://github.com/luckyme258/gboard2ms_win11)。本仓库保留 Python 版。
+
 # 微软拼音词库管理器 使用手册
 
-> **⬇️ 下载最新版**：请到 [Releases](https://github.com/luckyme258/gboard2ms_win11/releases/latest) 下载 **v1.0**。
+> **⬇️ 下载最新版**：请到 [Releases](https://github.com/luckyme258/gboard2ms_win11_python/releases/latest) 下载 **v1.0**。
 >
 > **⚠️ v0.1 / v0.2 已停止维护**：这两个旧版的 Gboard 导出还是旧格式 txt，导入新版安卓 Gboard 只会得到**空词典**，请勿下载使用。
 
@@ -231,7 +233,7 @@ A: 右上角「Language:」下拉框选 `中文` 即可；这只影响界面显�
 
 # English Manual
 
-> **⬇️ Download the latest version**: get **v1.0** from [Releases](https://github.com/luckyme258/gboard2ms_win11/releases/latest).
+> **⬇️ Download the latest version**: get **v1.0** from [Releases](https://github.com/luckyme258/gboard2ms_win11_python/releases/latest).
 >
 > **⚠️ v0.1 / v0.2 are no longer maintained**: they still export the legacy txt format, which imports as an **empty dictionary** on the current Android Gboard. Do not download them.
 
